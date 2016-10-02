@@ -13,6 +13,7 @@ import requests
 from itp import itp
 from lxml import html
 
+__version__ = '0.0.1'
 
 class InstaSession(requests.Session):
     url = 'https://www.instagram.com/'
