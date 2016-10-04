@@ -13,7 +13,7 @@ import requests
 from itp import itp
 from lxml import html
 
-__version__ = '0.0.3'
+__version__ = '0.0.4'
 
 
 class InstaSession(requests.Session):
@@ -234,6 +234,9 @@ class InstaWebClient(object):
                 self.logger.info(log_text)
             except UnicodeEncodeError:
                 print("Your text has unicode problem!")
+
+    def get_media(self, code):
+        return InstaMedia(code=code, session=self.s)
 
     def get_user(self):
         # return InstaUser(username=username, session=self.s)
@@ -552,8 +555,25 @@ class InstaUser(InstaBase):
         return len(nodes) > 0
 
 
-class InstaMedia(object):
-    pass
+class InstaMedia(InstaBase):
+    def __init__(self, code=None, session=None):
+        super(InstaMedia, self).__init__()
+
+        if not session:
+            session = InstaSession()
+
+        self.s = session
+        self.url = 'https://www.instagram.com/p/%s/' % (code,)
+
+        resp = self.s.get(self.url + '?__a=1')
+        self._last_response = resp
+
+        data = resp.json()
+        self.data = data['media']
+        for key in self.data.keys():
+            setattr(self, key, self.data[key])
+
+        self.tags = self._parse_caption_hashtags(self.data.get('caption'))
 
 
 class InstaHashtag(InstaBase):
