@@ -13,7 +13,8 @@ import requests
 from itp import itp
 from lxml import html
 
-__version__ = '0.0.1'
+__version__ = '0.0.2'
+
 
 class InstaSession(requests.Session):
     url = 'https://www.instagram.com/'
@@ -243,6 +244,9 @@ class InstaWebClient(object):
 
     def get_user_by_username(self, username):
         return InstaUser(username=username, session=self.s)
+
+    def get_hashtag(self, tagname):
+        return InstaHashtag(tagname, session=self.s)
 
 
 class InstaBase(object):
