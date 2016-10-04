@@ -13,7 +13,7 @@ import requests
 from itp import itp
 from lxml import html
 
-__version__ = '0.0.2'
+__version__ = '0.0.3'
 
 
 class InstaSession(requests.Session):
@@ -369,12 +369,26 @@ class InstaUser(InstaBase):
 
             for key in (
                     'country_block', 'external_url', 'full_name', 'id', 'is_private',
-                    'is_verified', 'profile_pic_url',
+                    'is_verified', 'profile_pic_url', 'biography',
                     'profile_pic_url_hd', 'username',):
                 setattr(self, key, self.info.get(key))
 
             for key in ('followed_by', 'follows',):
                 setattr(self, key + '_count', self.info[key]['count'])
+
+    @property
+    def avg_comments(self):
+        if len(self._media) > 0:
+            return sum([m['comments']['count'] for m in self._media]) / len(self._media)
+
+        return 0
+
+    @property
+    def avg_likes(self):
+        if len(self._media) > 0:
+            return sum([m['likes']['count'] for m in self._media]) / len(self._media)
+
+        return 0
 
     @property
     def gen_follows(self):
