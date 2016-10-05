@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from __future__ import print_function
 
 import datetime
 import json
@@ -13,7 +14,13 @@ import requests
 from itp import itp
 from lxml import html
 
-__version__ = '0.0.4'
+__version__ = '0.0.5'
+
+logger = logging.getLogger('insta_client')
+formatter = logging.Formatter("%(asctime)s %(name)-12s %(levelname)-8s %(message)s")
+streamHandler = logging.StreamHandler()
+streamHandler.setFormatter(formatter)
+logger.addHandler(streamHandler)
 
 
 class InstaSession(requests.Session):
@@ -29,12 +36,12 @@ class InstaSession(requests.Session):
         super(InstaSession, self).__init__()
 
         self.csrftoken = ''
-        self.log_file_path = None
-        self.log_mod = 0
+
         self.login_status = False
         self.user_id = None
         self.user_login = None
         self.user_password = None
+        self.logger = logger
 
     def login(self, login=None, password=None):
         if login:
@@ -43,8 +50,8 @@ class InstaSession(requests.Session):
         if password:
             self.user_password = password
 
-        log_string = 'Trying to login as %s...\n' % self.user_login
-        self.log(log_string)
+        log_string = 'TRYING TO LOGIN AS: %s' % self.user_login
+        self.logger.info(log_string)
         self.cookies.update({'sessionid': '', 'mid': '', 'ig_pr': '1',
                              'ig_vw': '1920', 'csrftoken': '',
                              's_network': '', 'ds_user_id': ''})
@@ -57,72 +64,47 @@ class InstaSession(requests.Session):
                              'Content-Length': '0',
                              'Host': 'www.instagram.com',
                              'Origin': 'https://www.instagram.com',
-                             'Referer': 'https://www.instagram.com/',
+                             'Referer': self.url,
                              'User-Agent': self.user_agent,
                              'X-Instagram-AJAX': '1',
                              'X-Requested-With': 'XMLHttpRequest'})
+        self.logger.debug('GET %s' % self.url)
         r = self.get(self.url)
         self.headers.update({'X-CSRFToken': r.cookies['csrftoken']})
         time.sleep(5 * random.random())
+        self.logger.debug('POST %s' % self.url_login, extra=_login_post)
         login = self.post(self.url_login, data=_login_post, allow_redirects=True)
+        self.logger.debug('POST STATUS_CODE: %s' % login.status_code)
         self.headers.update({'X-CSRFToken': login.cookies['csrftoken']})
         self.csrftoken = login.cookies['csrftoken']
         time.sleep(5 * random.random())
 
         if login.status_code == 200:
-            r = self.get('https://www.instagram.com/')
+            self.logger.debug('GET %s' % self.url)
+            r = self.get(self.url)
+            self.logger.debug('GET STATUS_CODE: %s' % r.status_code)
             finder = r.text.find(self.user_login)
             if finder != -1:
                 self.login_status = True
-                log_string = '%s login success!' % self.user_login
-                self.log(log_string)
+                log_string = 'LOGIN SUCCESS: %s' % self.user_login
+                self.logger.info(log_string)
             else:
                 self.login_status = False
-                self.log('Login error! Check your login data!')
+                self.logger.info('LOGIN ERROR: Check your login data!')
         else:
-            self.log('Login error! Connection error!')
+            self.logger.info('LOGIN ERROR: Connection error!')
 
     def logout(self):
         log_string = 'Logout'
-        self.log(log_string)
+        self.logger.info(log_string)
 
         try:
             logout_post = {'csrfmiddlewaretoken': self.csrftoken}
             logout = self.post(self.url_logout, data=logout_post)
-            self.log("Logout success!")
+            self.logger.info("Logout success!")
             self.login_status = False
         except:
-            self.log("Logout error!")
-
-    def log(self, log_text):
-        """ Write log by print() or logger """
-
-        if self.log_mod == 0:
-            try:
-                print(log_text)
-            except UnicodeEncodeError:
-                print("Your text has unicode problem!")
-        elif self.log_mod == 1:
-            # Create log_file if not exist.
-            if self.log_file == 0:
-                self.log_file = 1
-                now_time = datetime.datetime.now()
-                self.log_full_path = '%s%s_%s.log' % (self.log_file_path,
-                                                      self.user_login,
-                                                      now_time.strftime("%d.%m.%Y_%H:%M"))
-                formatter = logging.Formatter('%(asctime)s - %(name)s '
-                                              '- %(message)s')
-                self.logger = logging.getLogger(self.user_login)
-                self.hdrl = logging.FileHandler(self.log_full_path, mode='w')
-                self.hdrl.setFormatter(formatter)
-                self.logger.setLevel(level=logging.INFO)
-                self.logger.addHandler(self.hdrl)
-
-            # Log to log file.
-            try:
-                self.logger.info(log_text)
-            except UnicodeEncodeError:
-                print("Your text has unicode problem!")
+            self.logger.info("Logout error!")
 
 
 class InstaWebClient(object):
@@ -158,24 +140,14 @@ class InstaWebClient(object):
     # List of user_id, that bot follow
     bot_follow_list = []
 
-    # Log setting.
-    log_file_path = ''
-    log_file = 0
-
     # Other.
     user_id = 0
     media_by_tag = 0
     login_status = False
 
-    def __init__(self, login=None, password=None, log_mod=0, ):
-
+    def __init__(self, login=None, password=None):
         self.bot_start = datetime.datetime.now()
 
-        self.time_in_day = 24 * 60 * 60
-
-        # log_mod 0 to console, 1 to file
-        self.log_mod = log_mod
-        # self.s = requests.Session()
         self.s = InstaSession()
 
         # convert login to lower
@@ -187,11 +159,10 @@ class InstaWebClient(object):
 
         self.media_by_tag = []
         self.csrftoken = ''
+        self.logger = logger
 
-        now_time = datetime.datetime.now()
-        log_string = 'InstaClient v1.0.1 started at %s:\n' % \
-                     (now_time.strftime("%d.%m.%Y %H:%M"))
-        self.log(log_string)
+        log_string = 'InstaClient v%s started' % __version__
+        self.logger.info(log_string)
 
     def login(self, login=None, password=None):
         if login:
@@ -204,36 +175,6 @@ class InstaWebClient(object):
 
     def logout(self):
         return self.s.logout()
-
-    def log(self, log_text):
-        """ Write log by print() or logger """
-
-        if self.log_mod == 0:
-            try:
-                print(log_text)
-            except UnicodeEncodeError:
-                print("Your text has unicode problem!")
-        elif self.log_mod == 1:
-            # Create log_file if not exist.
-            if self.log_file == 0:
-                self.log_file = 1
-                now_time = datetime.datetime.now()
-                self.log_full_path = '%s%s_%s.log' % (self.log_file_path,
-                                                      self.user_login,
-                                                      now_time.strftime("%d.%m.%Y_%H:%M"))
-                formatter = logging.Formatter('%(asctime)s - %(name)s '
-                                              '- %(message)s')
-                self.logger = logging.getLogger(self.user_login)
-                self.hdrl = logging.FileHandler(self.log_full_path, mode='w')
-                self.hdrl.setFormatter(formatter)
-                self.logger.setLevel(level=logging.INFO)
-                self.logger.addHandler(self.hdrl)
-
-            # Log to log file.
-            try:
-                self.logger.info(log_text)
-            except UnicodeEncodeError:
-                print("Your text has unicode problem!")
 
     def get_media(self, code):
         return InstaMedia(code=code, session=self.s)
