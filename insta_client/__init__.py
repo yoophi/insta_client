@@ -16,11 +16,24 @@ from lxml import html
 
 __version__ = '0.0.5'
 
-logger = logging.getLogger('insta_client')
-formatter = logging.Formatter("%(asctime)s %(name)-12s %(levelname)-8s %(message)s")
-streamHandler = logging.StreamHandler()
-streamHandler.setFormatter(formatter)
-logger.addHandler(streamHandler)
+logger = logging.getLogger(__name__)
+logger.addHandler(logging.NullHandler())
+
+
+def add_stderr_logger(level=logging.DEBUG):
+    """
+    Helper for quickly adding a StreamHandler to the logger. Useful for
+    debugging.
+
+    Returns the handler after adding it.
+    """
+    _logger = logging.getLogger(__name__)
+    handler = logging.StreamHandler()
+    handler.setFormatter(logging.Formatter('%(asctime)s %(levelname)s %(message)s'))
+    _logger.addHandler(handler)
+    _logger.setLevel(level)
+    _logger.debug('Added a stderr logging handler to logger: %s', __name__)
+    return handler
 
 
 class InstaSession(requests.Session):
@@ -41,7 +54,6 @@ class InstaSession(requests.Session):
         self.user_id = None
         self.user_login = None
         self.user_password = None
-        self.logger = logger
 
     def login(self, login=None, password=None):
         if login:
@@ -51,7 +63,7 @@ class InstaSession(requests.Session):
             self.user_password = password
 
         log_string = 'TRYING TO LOGIN AS: %s' % self.user_login
-        self.logger.info(log_string)
+        logger.info(log_string)
         self.cookies.update({'sessionid': '', 'mid': '', 'ig_pr': '1',
                              'ig_vw': '1920', 'csrftoken': '',
                              's_network': '', 'ds_user_id': ''})
@@ -68,43 +80,43 @@ class InstaSession(requests.Session):
                              'User-Agent': self.user_agent,
                              'X-Instagram-AJAX': '1',
                              'X-Requested-With': 'XMLHttpRequest'})
-        self.logger.debug('GET %s' % self.url)
+        logger.debug('GET %s' % self.url)
         r = self.get(self.url)
         self.headers.update({'X-CSRFToken': r.cookies['csrftoken']})
         time.sleep(5 * random.random())
-        self.logger.debug('POST %s' % self.url_login, extra=_login_post)
+        logger.debug('POST %s' % self.url_login, extra=_login_post)
         login = self.post(self.url_login, data=_login_post, allow_redirects=True)
-        self.logger.debug('POST STATUS_CODE: %s' % login.status_code)
+        logger.debug('POST STATUS_CODE: %s' % login.status_code)
         self.headers.update({'X-CSRFToken': login.cookies['csrftoken']})
         self.csrftoken = login.cookies['csrftoken']
         time.sleep(5 * random.random())
 
         if login.status_code == 200:
-            self.logger.debug('GET %s' % self.url)
+            logger.debug('GET %s' % self.url)
             r = self.get(self.url)
-            self.logger.debug('GET STATUS_CODE: %s' % r.status_code)
+            logger.debug('GET STATUS_CODE: %s' % r.status_code)
             finder = r.text.find(self.user_login)
             if finder != -1:
                 self.login_status = True
                 log_string = 'LOGIN SUCCESS: %s' % self.user_login
-                self.logger.info(log_string)
+                logger.info(log_string)
             else:
                 self.login_status = False
-                self.logger.info('LOGIN ERROR: Check your login data!')
+                logger.info('LOGIN ERROR: Check your login data!')
         else:
-            self.logger.info('LOGIN ERROR: Connection error!')
+            logger.info('LOGIN ERROR: Connection error!')
 
     def logout(self):
         log_string = 'Logout'
-        self.logger.info(log_string)
+        logger.info(log_string)
 
         try:
             logout_post = {'csrfmiddlewaretoken': self.csrftoken}
             logout = self.post(self.url_logout, data=logout_post)
-            self.logger.info("Logout success!")
+            logger.info("Logout success!")
             self.login_status = False
         except:
-            self.logger.info("Logout error!")
+            logger.info("Logout error!")
 
 
 class InstaWebClient(object):
@@ -159,10 +171,9 @@ class InstaWebClient(object):
 
         self.media_by_tag = []
         self.csrftoken = ''
-        self.logger = logger
 
         log_string = 'InstaClient v%s started' % __version__
-        self.logger.info(log_string)
+        logger.info(log_string)
 
     def login(self, login=None, password=None):
         if login:
