@@ -62,8 +62,7 @@ class InstaSession(requests.Session):
         if password:
             self.user_password = password
 
-        log_string = 'TRYING TO LOGIN AS: %s' % self.user_login
-        logger.info(log_string)
+        logger.debug('TRYING TO LOGIN AS: %s' % self.user_login)
         self.cookies.update({'sessionid': '', 'mid': '', 'ig_pr': '1',
                              'ig_vw': '1920', 'csrftoken': '',
                              's_network': '', 'ds_user_id': ''})
@@ -98,25 +97,23 @@ class InstaSession(requests.Session):
             finder = r.text.find(self.user_login)
             if finder != -1:
                 self.login_status = True
-                log_string = 'LOGIN SUCCESS: %s' % self.user_login
-                logger.info(log_string)
+                logger.debug('LOGIN SUCCESS: %s' % self.user_login)
             else:
                 self.login_status = False
-                logger.info('LOGIN ERROR: Check your login data!')
+                logger.error('LOGIN ERROR: Check your login data!')
         else:
-            logger.info('LOGIN ERROR: Connection error!')
+            logger.error('LOGIN ERROR: Connection error!')
 
     def logout(self):
-        log_string = 'Logout'
-        logger.info(log_string)
+        logger.debug('Logout')
 
         try:
             logout_post = {'csrfmiddlewaretoken': self.csrftoken}
             logout = self.post(self.url_logout, data=logout_post)
-            logger.info("Logout success!")
+            logger.debug("LOGOUT SUCCESS!")
             self.login_status = False
         except:
-            logger.info("Logout error!")
+            logger.error("LOGOUT ERROR!")
 
 
 class InstaWebClient(object):
@@ -172,8 +169,7 @@ class InstaWebClient(object):
         self.media_by_tag = []
         self.csrftoken = ''
 
-        log_string = 'InstaClient v%s started' % __version__
-        logger.info(log_string)
+        logger.debug('InstaClient v%s started' % __version__)
 
     def login(self, login=None, password=None):
         if login:
