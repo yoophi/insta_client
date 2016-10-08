@@ -11,6 +11,10 @@ class InstaLoginRequiredError(Exception):
     pass
 
 
+class InstaApiClientError(Exception):
+    pass
+
+
 class InstaWebClientError(Exception):
     pass
 
@@ -62,10 +66,11 @@ class InstaWebClient(object):
 
         return check_login
 
-    def __init__(self, login=None, password=None):
+    def __init__(self, login=None, password=None, access_token=None):
         self.bot_start = datetime.datetime.now()
 
         self.s = InstaSession()
+        self.api = InstaApiClient(access_token=access_token)
 
         # convert login to lower
         if login:
@@ -91,6 +96,9 @@ class InstaWebClient(object):
     def logout(self):
         return self.s.logout()
 
+    def set_access_token(self, access_token):
+        self.api = InstaApiClient(access_token=access_token)
+
     def get_media(self, code):
         return InstaMedia(code=code, session=self.s)
 
@@ -103,10 +111,12 @@ class InstaWebClient(object):
             raise ValueError('Neither id nor username given')
 
     def get_user_by_id(self, id):
-        """
-        TODO: implement
-        """
-        raise NotImplementedError
+        # """
+        # TODO: implement
+        # """
+        # raise NotImplementedError
+        username = self.api.get_username_by_id(id)
+        return self.get_user_by_username(username)
 
     def get_user_by_username(self, username):
         return InstaUser(username=username, session=self.s)
@@ -159,7 +169,7 @@ class InstaApiClient(object):
     @property
     def access_token(self):
         if not self._access_token:
-            raise AttributeError('access_token is not found.')
+            raise InstaApiClientError('access_token is not found.')
 
         return self._access_token
 
