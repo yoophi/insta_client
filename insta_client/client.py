@@ -7,6 +7,14 @@ from .instagram import InstaUser, InstaMedia, InstaHashtag
 from .session import InstaSession
 
 
+class InstaLoginRequiredError(Exception):
+    pass
+
+
+class InstaWebClientError(Exception):
+    pass
+
+
 class InstaWebClient(object):
     url = 'https://www.instagram.com/'
     url_tag = 'https://www.instagram.com/explore/tags/'
@@ -45,6 +53,15 @@ class InstaWebClient(object):
     media_by_tag = 0
     login_status = False
 
+    def _login_required(f):
+        def check_login(self, *args, **kwargs):
+            if not self.s.login_status:
+                raise InstaLoginRequiredError('login required')
+
+            return f(self, *args, **kwargs)
+
+        return check_login
+
     def __init__(self, login=None, password=None):
         self.bot_start = datetime.datetime.now()
 
@@ -60,7 +77,7 @@ class InstaWebClient(object):
         self.media_by_tag = []
         self.csrftoken = ''
 
-        logger.debug('InstaClient v%s started' % __version__)
+        logger.debug('%s v%s started' % (self.__class__.__name__, __version__))
 
     def login(self, login=None, password=None):
         if login:
@@ -96,6 +113,41 @@ class InstaWebClient(object):
 
     def get_hashtag(self, tagname):
         return InstaHashtag(tagname, session=self.s)
+
+    def get_current_user(self):
+        if not self.s.user_login:
+            raise InstaWebClientError('not logged in yet')
+
+        return self.get_user(username=self.s.user_login)
+
+    @_login_required
+    def follow(self, user_id):
+        logger.debug('FOLLOW: %s' % user_id)
+        url_follow = self.url_follow % user_id
+        logger.debug('URL_FOLLOW: %s' % url_follow)
+        try:
+            follow = self.s.post(url_follow)
+            if follow.status_code == 200:
+                self.follow_counter += 1
+                logger.debug("FOLLOW OK: %s #%i." % (user_id, self.follow_counter))
+
+            return follow
+        except Exception as e:
+            logger.error("EXCEPT on follow: %s" % e)
+
+    @_login_required
+    def unfollow(self, user_id):
+        logger.debug('UNFOLLOW: %s' % user_id)
+        url_unfollow = self.url_unfollow % user_id
+        logger.debug('URL_UNFOLLOW: %s' % url_unfollow)
+        try:
+            unfollow = self.s.post(url_unfollow)
+            if unfollow.status_code == 200:
+                logger.debug("UNFOLLOW OK: %s #%i." % (user_id, self.unfollow_counter))
+
+            return unfollow
+        except Exception as e:
+            logger.error("EXCEPT on unfollow: %s" % e)
 
 
 class InstaApiClient(object):
