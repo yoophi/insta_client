@@ -131,6 +131,21 @@ class InstaWebClient(object):
         return self.get_user(username=self.s.user_login)
 
     @_login_required
+    def comment(self, media_id, text):
+        logger.debug('COMMENT: <media_id:%s> <text:%s>' % (media_id, text))
+        comment_post = {'comment_text': text}
+        url_comment = self.url_comment % media_id
+        logger.debug('URL_COMMENT: %s' % url_comment)
+        try:
+            comment = self.s.post(url_comment, data=comment_post)
+            if comment.status_code == 200:
+                self.comments_counter += 1
+                logger.debug('Write: "%s". #%i.' % (text, self.comments_counter))
+            return comment
+        except:
+            raise InstaWebClientError("EXCEPT on comment!")
+
+    @_login_required
     def follow(self, user_id):
         logger.debug('FOLLOW: %s' % user_id)
         url_follow = self.url_follow % user_id
