@@ -146,6 +146,24 @@ class InstaWebClient(object):
             raise InstaWebClientError("EXCEPT on comment!")
 
     @_login_required
+    def like(self, media_id):
+        logger.debug('LIKE: <media_id:%s>' % media_id)
+        url_likes = self.url_likes % media_id
+        try:
+            return self.s.post(url_likes)
+        except:
+            raise InstaWebClientError("EXCEPT on like")
+
+    @_login_required
+    def unlike(self, media_id):
+        logger.debug('UNLIKE: <media_id:%s>' % media_id)
+        url_unlike = self.url_unlike % media_id
+        try:
+            return self.s.post(url_unlike)
+        except:
+            raise InstaWebClientError("EXCEPT on unlike")
+
+    @_login_required
     def follow(self, user_id):
         logger.debug('FOLLOW: %s' % user_id)
         url_follow = self.url_follow % user_id
