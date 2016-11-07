@@ -2,10 +2,8 @@ import json
 import re
 import urllib
 from collections import Counter
-
 from itp import itp
 from lxml import html
-
 from .session import InstaSession
 
 
@@ -321,6 +319,7 @@ class InstaMedia(InstaBase):
 
         self.s = session
         self.url = 'https://www.instagram.com/p/%s/' % (code,)
+        self._user = None
 
         resp = self.s.get(self.url + '?__a=1')
         self._last_response = resp
@@ -331,6 +330,16 @@ class InstaMedia(InstaBase):
             setattr(self, key, self.data[key])
 
         self.tags = self._parse_caption_hashtags(self.data.get('caption'))
+
+    @property
+    def user(self):
+        if not self._user:
+            if not self.owner['username']:
+                raise ValueError('media not loaded')
+
+            self._user = InstaUser(username=self.owner['username'])
+
+        return self._user
 
 
 class InstaHashtag(InstaBase):
