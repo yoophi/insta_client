@@ -2,8 +2,10 @@ import json
 import re
 import urllib
 from collections import Counter
+
 from itp import itp
 from lxml import html
+
 from .session import InstaSession
 
 
@@ -84,8 +86,12 @@ class InstaUser(InstaBase):
         self.s = session
         self.id = user_id
         self.username = username
+
         self._follows = []
+        self._followed_by = []
+
         self.follows_count = 1  # FIXME
+        self.followed_by_count = 1  # FIXME
 
         self.s.cookies.update({'sessionid': '', 'mid': '', 'ig_pr': '1',
                                'ig_vw': '1920', 'csrftoken': '',
@@ -176,6 +182,34 @@ class InstaUser(InstaBase):
     def get_all_follows(self):
         return list(self.gen_follows)
 
+    @property
+    def gen_followed_by(self):
+        """
+        generator
+
+        :return:
+        """
+        idx = 0
+
+        while idx < self.followed_by_count:
+            if len(self._followed_by) <= idx:
+                if not self._fetch_next_followed_by():
+                    break
+
+            try:
+                yield self._followed_by[idx]
+            except IndexError:
+                pass
+
+            idx += 1
+
+    def get_n_followed_by(self, n=10):
+        g = self.gen_followed_by
+        return [g.next() for _ in range(n)]
+
+    def get_all_followed_by(self):
+        return list(self.gen_followed_by)
+
     def _fetch_next_follows(self, cnt=10):
         if len(self._follows) == 0:
             # first request
@@ -255,6 +289,88 @@ class InstaUser(InstaBase):
 
             for node in nodes:
                 self._follows.append(node)
+
+            return len(nodes) > 0
+
+    def _fetch_next_followed_by(self, cnt=10):
+        if len(self._followed_by) == 0:
+            # first request
+            q = """
+                ig_user(%s) {
+                  followed_by.first(%s) {
+                    count,
+                    page_info {
+                      end_cursor,
+                      has_next_page
+                    },
+                    nodes {
+                      id,
+                      is_verified,
+                      followed_by_viewer,
+                      requested_by_viewer,
+                      full_name,
+                      profile_pic_url,
+                      username
+                    }
+                  }
+                }""" % (self.id, cnt)
+            ref = 'relationships::follow_list'
+            post_data = dict(q=q, ref=ref)
+
+            self.s.headers.update({
+                'Content-Type': 'application/x-www-form-urlencoded',
+            })
+            r1 = self.s.post('https://www.instagram.com/query/', data=post_data)
+
+            self._followed_by_page_info = r1.json()['followed_by']['page_info']
+            self.followed_by_count = r1.json()['followed_by']['count']
+
+            nodes = r1.json()['followed_by']['nodes']
+            for node in nodes:
+                self._followed_by.append(node)
+
+            return len(nodes) > 0
+
+        else:
+            if not self._followed_by_page_info['has_next_page']:
+                return False
+
+            end_cursor = self._followed_by_page_info['end_cursor']
+
+            q = """
+            ig_user(%s) {
+              followed_by.after(%s, 10) {
+                count,
+                page_info {
+                  end_cursor,
+                  has_next_page
+                },
+                nodes {
+                  id,
+                  is_verified,
+                  followed_by_viewer,
+                  requested_by_viewer,
+                  full_name,
+                  profile_pic_url,
+                  username
+                }
+              }
+            }""" % (self.id, end_cursor)
+            ref = 'relationships::follow_list'
+            post_data = dict(q=q, ref=ref)
+
+            self.s.headers.update({
+                'Content-Type': 'application/x-www-form-urlencoded',
+            })
+            r2 = self.s.post('https://www.instagram.com/query/', data=post_data)
+
+            assert r2.status_code == 200
+
+            nodes = r2.json()['followed_by']['nodes']
+            self._followed_by_page_info = r2.json()['followed_by']['page_info']
+
+            for node in nodes:
+                self._followed_by.append(node)
 
             return len(nodes) > 0
 
