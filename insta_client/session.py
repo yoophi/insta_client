@@ -15,6 +15,15 @@ class InstaSession(requests.Session):
                   "(KHTML, like Gecko) Chrome/48.0.2564.103 Safari/537.36")
     accept_language = 'ru-RU,ru;q=0.8,en-US;q=0.6,en;q=0.4'
 
+
+    __attrs__ = [
+        'headers', 'cookies', 'auth', 'proxies', 'hooks', 'params', 'verify',
+        'cert', 'prefetch', 'adapters', 'stream', 'trust_env',
+        'max_redirects',
+        'url', 'url_login', 'url_logout', 'user_agent', 'accept_langulage',
+        'login_status', 'user_id', 'user_login', 'user_password',
+    ]
+
     def __init__(self):
         super(InstaSession, self).__init__()
 

@@ -66,10 +66,14 @@ class InstaWebClient(object):
 
         return check_login
 
-    def __init__(self, login=None, password=None, access_token=None):
+    def __init__(self, login=None, password=None, access_token=None, session=None):
         self.bot_start = datetime.datetime.now()
 
-        self.s = InstaSession()
+        if session:
+            self.s = session
+        else:
+            self.s = InstaSession()
+
         self.api = InstaApiClient(access_token=access_token)
 
         # convert login to lower
