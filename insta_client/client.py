@@ -3,7 +3,7 @@ import datetime
 import requests
 
 from . import logger, __version__
-from .instagram import InstaUser, InstaMedia, InstaHashtag
+from .instagram import InstaUser, InstaMedia, InstaHashtag, InstaFeed
 from .session import InstaSession
 
 
@@ -135,6 +135,10 @@ class InstaWebClient(object):
         return self.get_user(username=self.s.user_login)
 
     @_login_required
+    def get_feed(self):
+        return InstaFeed(session=self.s)
+
+    @_login_required
     def comment(self, media_id, text):
         logger.debug('COMMENT: <media_id:%s> <text:%s>' % (media_id, text))
         comment_post = {'comment_text': text}
@@ -217,6 +221,15 @@ class InstaApiClient(object):
 
     def get_userdata_by_id(self, id):
         url = 'https://api.instagram.com/v1/users/%s?access_token=%s' % (id, self.access_token)
+        rv = requests.get(url)
+
+        try:
+            return rv.json()['data']
+        except:
+            return None
+
+    def get_users_self(self):
+        url = 'https://api.instagram.com/v1/users/self?access_token=%s' % (self.access_token,)
         rv = requests.get(url)
 
         try:

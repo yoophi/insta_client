@@ -541,3 +541,204 @@ class InstaHashtag(InstaBase):
             self._media.append(self._format_media(m))
 
         return len(nodes) > 0
+
+
+class InstaFeed(InstaBase):
+    def __init__(self, user_id=None, username=None, session=None):
+        super(InstaFeed, self).__init__()
+
+        if not session:
+            session = InstaSession()
+
+        self.s = session
+        self.id = user_id
+        self.username = username
+
+        self.s.cookies.update({'sessionid': '', 'mid': '', 'ig_pr': '1',
+                               'ig_vw': '1920', 'csrftoken': '',
+                               's_network': '', 'ds_user_id': ''})
+
+        self.s.headers.update({'Accept-Encoding': 'gzip, deflate',
+                               'Accept-Language': self.accept_language,
+                               'Connection': 'keep-alive',
+                               'Content-Length': '0',
+                               'Host': 'www.instagram.com',
+                               'Origin': 'https://www.instagram.com',
+                               'Referer': 'https://www.instagram.com/',
+                               'User-Agent': self.user_agent,
+                               })
+
+        if not self.s.login_status:
+            raise Exception('NOT LOGGED IN')
+
+        self.feed_url = 'https://www.instagram.com/'
+        resp = self.s.get(self.feed_url)
+        tree = html.fromstring(resp.content)
+        _script_text = ''.join(
+            tree.xpath('//script[contains(text(), "sharedData")]/text()'))
+        _shared_data = ''.join(
+            re.findall(r'window._sharedData = (.*);', _script_text))
+
+        assert resp.status_code == 200
+        data = json.loads(_shared_data)
+
+        feed_media = data['entry_data']['FeedPage'][0]['feed']['media']
+
+
+        # user_obj = data['entry_data']['ProfilePage'][0]['user']
+        # media_obj = user_obj.pop('media')
+        # self.info = user_obj
+        # self.media_count = media_obj['count']
+        # self.media_page_info = media_obj['page_info']
+        # for m in media_obj['nodes']:
+        #     self._media.append(self._format_media(m))
+
+        media_nodes = feed_media['nodes']
+        self.media_page_info = feed_media['page_info']
+
+        for m in media_nodes:
+            self._media.append(self._format_media(m))
+
+        self._last_response = resp
+
+        self.s.headers.update({'X-CSRFToken': resp.cookies['csrftoken']})
+
+        # for key in (
+        #         'country_block', 'external_url', 'full_name', 'id', 'is_private',
+        #         'is_verified', 'profile_pic_url', 'biography',
+        #         'profile_pic_url_hd', 'username',):
+        #     setattr(self, key, self.info.get(key))
+        #
+        # for key in ('followed_by', 'follows',):
+        #     setattr(self, key + '_count', self.info[key]['count'])
+
+    # def get_n_media(self, n=10):
+    #     pass
+
+    @property
+    def gen_media(self):
+        """
+        generator
+
+        :return:
+        """
+        idx = 0
+
+        while True:
+            if len(self._media) <= idx:
+                if not self._fetch_next_media():
+                    break
+
+            try:
+                yield self._media[idx]
+            except IndexError:
+                pass
+
+            idx += 1
+
+    def _fetch_next_media(self, cnt=33):
+        ig_url = 'https://www.instagram.com/query/'
+        last_media_id = int(self._media[-1]['id'])
+
+        if not self.media_page_info['has_next_page']:
+            raise Exception('NO NEXT PAGE')
+
+        self.s.headers.update({
+            'Content-Type': 'application/x-www-form-urlencoded',
+        })
+
+        q = '''
+        ig_me() {
+          feed {
+            media.after(%s, 12) {
+              nodes {
+                id,
+                attribution,
+                caption,
+                code,
+                comments.last(4) {
+                  count,
+                  nodes {
+                    id,
+                    created_at,
+                    text,
+                    user {
+                      id,
+                      profile_pic_url,
+                      username
+                    }
+                  },
+                  page_info
+                },
+                comments_disabled,
+                date,
+                dimensions {
+                  height,
+                  width
+                },
+                display_src,
+                is_video,
+                likes {
+                  count,
+                  nodes {
+                    user {
+                      id,
+                      profile_pic_url,
+                      username
+                    }
+                  },
+                  viewer_has_liked
+                },
+                location {
+                  id,
+                  has_public_page,
+                  name,
+                  slug
+                },
+                owner {
+                  id,
+                  blocked_by_viewer,
+                  followed_by_viewer,
+                  full_name,
+                  has_blocked_viewer,
+                  is_private,
+                  profile_pic_url,
+                  requested_by_viewer,
+                  username
+                },
+                usertags {
+                  nodes {
+                    user {
+                      username
+                    },
+                    x,
+                    y
+                  }
+                },
+                video_url,
+                video_views
+              },
+              page_info
+            }
+          },
+          id,
+          profile_pic_url,
+          username
+        }
+        ''' % (self.media_page_info['end_cursor'],)
+        ref = 'feed::show'
+
+        post_data = dict(q=q, ref=ref)
+
+        resp = self.s.post(ig_url, data=post_data, )
+
+        nodes = resp.json()['feed']['media']['nodes']
+
+        self.media_page_info = resp.json()['feed']['media']['page_info']
+        self._last_response = resp
+
+        for m in nodes:
+            self._media.append(self._format_media(m))
+
+        return len(nodes) > 0
+
