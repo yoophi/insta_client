@@ -4,7 +4,7 @@ from __future__ import unicode_literals
 
 import logging
 
-__version__ = '0.0.9'
+__version__ = '0.0.10'
 __all__ = ['logger', 'add_stderr_logger',
            'InstaSession', 'InstaApiClient', 'InstaWebClient',
            'InstaHashtag', 'InstaMedia', 'InstaUser']

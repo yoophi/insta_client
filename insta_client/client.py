@@ -19,6 +19,10 @@ class InstaWebClientError(Exception):
     pass
 
 
+class RateLimitError(Exception):
+    pass
+
+
 class InstaWebClient(object):
     url = 'https://www.instagram.com/'
     url_tag = 'https://www.instagram.com/explore/tags/'
@@ -236,3 +240,54 @@ class InstaApiClient(object):
             return rv.json()['data']
         except:
             return None
+
+    def like_media(self, media_id):
+        url = 'https://api.instagram.com/v1/media/%s/likes?access_token=%s' % (media_id, self.access_token)
+        rv = requests.post(url, {})
+        ratelimit = rv.headers['x-ratelimit-remaining']
+        logger.debug('LIKE_MEDIA RATELIMIT: %s' % ratelimit)
+
+        return rv
+
+    def follow_user(self, user_id):
+        url = 'https://api.instagram.com/v1/users/%s/relationship?access_token=%s' % (user_id, self.access_token,)
+        rv = requests.post(url, {'action': 'follow'})
+        ratelimit = rv.headers['x-ratelimit-remaining']
+        logger.debug('FOLLOW_USER RATELIMIT: %s' % ratelimit)
+
+        return rv
+
+    def unfollow_user(self):
+        pass
+
+    def get_media(self, media_id):
+        url = 'https://api.instagram.com/v1/media/%s?access_token=%s' % (media_id, self.access_token,)
+        rv = requests.get(url)
+        logger.debug(rv)
+
+        return rv.json()['data']
+
+    def user_followed_user(self, user_id):
+        url = 'https://api.instagram.com/v1/users/%s/relationship?access_token=%s' % (user_id, self.access_token,)
+        rv = requests.get(url)
+        try:
+            return rv.json()['data']['outgoing_status'] == 'follows'
+        except Exception:
+            pass
+
+        return False
+
+    def user_liked_media(self, media_id):
+        media = self.get_media(media_id)
+        try:
+            return media.get('user_has_liked')
+        except Exception:
+            pass
+
+        return False
+
+    def user_recent_media(self, user_id):
+        url = 'https://api.instagram.com/v1/users/%s/media/recent?access_token=%s' % (user_id, self.access_token,)
+        rv = requests.get(url)
+
+        return rv.json()['data']
