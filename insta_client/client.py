@@ -19,7 +19,19 @@ class InstaWebClientError(Exception):
     pass
 
 
-class RateLimitError(Exception):
+class BadRequestException(Exception):
+    pass
+
+
+class InvalidAccessTokenException(Exception):
+    pass
+
+
+class NotFoundException(Exception):
+    pass
+
+
+class RateLimitException(Exception):
     pass
 
 
@@ -210,6 +222,31 @@ class InstaApiClient(object):
         super(InstaApiClient, self).__init__()
 
         self._access_token = access_token
+        self.last_response = None
+
+    def validate_response(self, resp, msg):
+        ratelimit = resp.headers.get('x-ratelimit-remaining')
+        logger.debug('RATELIMIT: %s / %s' % (ratelimit, msg))
+
+        if resp.status_code == 200:
+            return True
+
+        logger.debug(resp.text)
+
+        if resp.status_code == 400:
+            try:
+                error_type =  resp.json()['meta']['error_type']
+            except Exception as e:
+                print type(e), str(e)
+
+            if error_type == 'OAuthAccessTokenException':
+                raise InvalidAccessTokenException(msg)
+            elif error_type == 'APINotFoundError':
+                raise NotFoundException(msg)
+
+            raise BadRequestException(msg)
+        elif resp.status_code == 429:
+            raise RateLimitException(msg)
 
     @property
     def access_token(self):
@@ -227,6 +264,9 @@ class InstaApiClient(object):
         url = 'https://api.instagram.com/v1/users/%s?access_token=%s' % (id, self.access_token)
         rv = requests.get(url)
 
+        self.last_response = rv
+        self.validate_response(rv, 'GET /users/%s' % id)
+
         try:
             return rv.json()['data']
         except:
@@ -236,6 +276,9 @@ class InstaApiClient(object):
         url = 'https://api.instagram.com/v1/users/self?access_token=%s' % (self.access_token,)
         rv = requests.get(url)
 
+        self.last_response = rv
+        self.validate_response(rv, 'GET /users/self')
+
         try:
             return rv.json()['data']
         except:
@@ -244,16 +287,18 @@ class InstaApiClient(object):
     def like_media(self, media_id):
         url = 'https://api.instagram.com/v1/media/%s/likes?access_token=%s' % (media_id, self.access_token)
         rv = requests.post(url, {})
-        ratelimit = rv.headers['x-ratelimit-remaining']
-        logger.debug('LIKE_MEDIA RATELIMIT: %s' % ratelimit)
+
+        self.last_response = rv
+        self.validate_response(rv, 'POST /media/%s/likes' % media_id)
 
         return rv
 
     def follow_user(self, user_id):
         url = 'https://api.instagram.com/v1/users/%s/relationship?access_token=%s' % (user_id, self.access_token,)
         rv = requests.post(url, {'action': 'follow'})
-        ratelimit = rv.headers['x-ratelimit-remaining']
-        logger.debug('FOLLOW_USER RATELIMIT: %s' % ratelimit)
+
+        self.last_response = rv
+        self.validate_response(rv, 'POST users/%s/relationship' % user_id)
 
         return rv
 
@@ -263,13 +308,19 @@ class InstaApiClient(object):
     def get_media(self, media_id):
         url = 'https://api.instagram.com/v1/media/%s?access_token=%s' % (media_id, self.access_token,)
         rv = requests.get(url)
-        logger.debug(rv)
+
+        self.last_response = rv
+        self.validate_response(rv, 'GET /media/%s' % (media_id,))
 
         return rv.json()['data']
 
     def user_followed_user(self, user_id):
         url = 'https://api.instagram.com/v1/users/%s/relationship?access_token=%s' % (user_id, self.access_token,)
         rv = requests.get(url)
+
+        self.last_response = rv
+        self.validate_response(rv, 'GET /users/%s/relationship' % (user_id,))
+
         try:
             return rv.json()['data']['outgoing_status'] == 'follows'
         except Exception:
@@ -279,6 +330,7 @@ class InstaApiClient(object):
 
     def user_liked_media(self, media_id):
         media = self.get_media(media_id)
+
         try:
             return media.get('user_has_liked')
         except Exception:
@@ -289,5 +341,8 @@ class InstaApiClient(object):
     def user_recent_media(self, user_id):
         url = 'https://api.instagram.com/v1/users/%s/media/recent?access_token=%s' % (user_id, self.access_token,)
         rv = requests.get(url)
+
+        self.last_response = rv
+        self.validate_response(rv, 'GET /users/%s/media/recent' % (user_id,))
 
         return rv.json()['data']
