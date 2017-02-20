@@ -235,7 +235,7 @@ class InstaApiClient(object):
 
         if resp.status_code == 400:
             try:
-                error_type =  resp.json()['meta']['error_type']
+                error_type = resp.json()['meta']['error_type']
             except Exception as e:
                 print type(e), str(e)
 
@@ -254,6 +254,46 @@ class InstaApiClient(object):
             raise InstaApiClientError('access_token is not found.')
 
         return self._access_token
+
+    def get_user_follows(self, next_page_url=None):
+        url = 'https://api.instagram.com/v1/users/self/follows?access_token=%s' % (self.access_token,)
+
+        if next_page_url:
+            url = next_page_url
+
+        rv = requests.get(url)
+
+        self.last_response = rv
+        self.validate_response(rv, 'GET /users/self/follows')
+
+        next_url = None
+        data = rv.json().get('data', [])
+        try:
+            next_url = rv.json()['pagination']['next_url']
+        except:
+            pass
+
+        return data, next_url is not None, next_url
+
+    def get_user_followed_by(self, next_page_url=None):
+        url = 'https://api.instagram.com/v1/users/self/followed-by?access_token=%s' % (self.access_token,)
+
+        if next_page_url:
+            url = next_page_url
+
+        rv = requests.get(url)
+
+        self.last_response = rv
+        self.validate_response(rv, 'GET /users/self/followed-by')
+
+        next_url = None
+        data = rv.json().get('data', [])
+        try:
+            next_url = rv.json()['pagination']['next_url']
+        except:
+            pass
+
+        return data, next_url is not None, next_url
 
     def get_username_by_id(self, id):
         data = self.get_userdata_by_id(id)
@@ -302,8 +342,14 @@ class InstaApiClient(object):
 
         return rv
 
-    def unfollow_user(self):
-        pass
+    def unfollow_user(self, user_id):
+        url = 'https://api.instagram.com/v1/users/%s/relationship?access_token=%s' % (user_id, self.access_token,)
+        rv = requests.post(url, {'action': 'unfollow'})
+
+        self.last_response = rv
+        self.validate_response(rv, 'POST users/%s/relationship' % user_id)
+
+        return rv
 
     def get_media(self, media_id):
         url = 'https://api.instagram.com/v1/media/%s?access_token=%s' % (media_id, self.access_token,)
@@ -344,5 +390,17 @@ class InstaApiClient(object):
 
         self.last_response = rv
         self.validate_response(rv, 'GET /users/%s/media/recent' % (user_id,))
+
+        return rv.json()['data']
+
+    def self_recent_media(self):
+        return self.user_recent_media('self')
+
+    def media_likes(self, media_id):
+        url = 'https://api.instagram.com/v1/media/%s/likes?access_token=%s' % (media_id, self.access_token,)
+        rv = requests.get(url)
+
+        self.last_response = rv
+        self.validate_response(rv, 'GET /media/%s/likes' % (media_id,))
 
         return rv.json()['data']
