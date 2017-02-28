@@ -108,7 +108,7 @@ class InstaUser(InstaBase):
                                })
 
         if self.username:
-            self.profile_url = 'http://instagram.com/{username}'.format(username=self.username)
+            self.profile_url = 'https://www.instagram.com/{username}/'.format(username=self.username)
             resp = self.s.get(self.profile_url)
             tree = html.fromstring(resp.content)
             _script_text = ''.join(
