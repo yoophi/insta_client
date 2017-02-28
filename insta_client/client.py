@@ -333,6 +333,15 @@ class InstaApiClient(object):
 
         return rv
 
+    def unlike_media(self, media_id):
+        url = 'https://api.instagram.com/v1/media/%s/likes?access_token=%s' % (media_id, self.access_token)
+        rv = requests.delete(url)
+
+        self.last_response = rv
+        self.validate_response(rv, 'DELETE /media/%s/likes' % media_id)
+
+        return rv
+
     def follow_user(self, user_id):
         url = 'https://api.instagram.com/v1/users/%s/relationship?access_token=%s' % (user_id, self.access_token,)
         rv = requests.post(url, {'action': 'follow'})
