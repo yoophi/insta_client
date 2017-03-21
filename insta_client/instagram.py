@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import json
 import re
 import urllib
@@ -6,6 +7,7 @@ from collections import Counter
 from itp import itp
 from lxml import html
 
+from . import logger
 from .session import InstaSession
 
 
@@ -584,7 +586,6 @@ class InstaFeed(InstaBase):
 
         feed_media = data['entry_data']['FeedPage'][0]['feed']['media']
 
-
         # user_obj = data['entry_data']['ProfilePage'][0]['user']
         # media_obj = user_obj.pop('media')
         # self.info = user_obj
@@ -742,3 +743,73 @@ class InstaFeed(InstaBase):
 
         return len(nodes) > 0
 
+
+class InstaApiBase(InstaBase):
+    def __init__(self, access_token, session=None):
+        super(InstaApiBase, self).__init__()
+        self.access_token = access_token
+
+        if not session:
+            session = InstaSession()
+
+        self.s = session
+
+
+class InstaApiUser(InstaApiBase):
+    pass
+
+
+class InstaApiMedia(InstaApiBase):
+    pass
+
+
+class InstaApiHashtag(InstaApiBase):
+    def __init__(self, hashtag, access_token, session=None):
+        super(InstaApiHashtag, self).__init__(access_token, session=session)
+
+        self.hashtag = hashtag
+
+        # 해시태그의 글 갯수 가져오기
+        endpoint = 'https://api.instagram.com/v1/tags/%s?access_token=%s' % (hashtag, self.access_token,)
+        resp = self.s.get(endpoint)
+        self.media_count = resp.json()['data']['media_count']
+
+        # MEDIA 첫 페이지 가져오기
+        self.endpoint = 'https://api.instagram.com/v1/tags/%s/media/recent?access_token=%s' % (hashtag, self.access_token,)
+        resp = self.s.get(self.endpoint)
+        self._last_response = resp
+        self._pagination = resp.json()['pagination']
+
+        nodes = resp.json()['data']
+        for m in nodes:
+            self._media.append(self._format_media(m))
+
+    def _format_media(self, media):
+        # MEDIA CODE 가져오기
+        code = None
+        regex = re.compile(
+            r'^(?:http)s?://'  # http:// or https://
+            r'(?:www.)?'
+            r'instagram.com'  # domain...
+            r'/p/'  # media ...
+            r'([a-zA-Z0-9_-]+)'  # CODE
+            r'(?:/?|[/?]\S+)$', re.IGNORECASE)
+
+        m = regex.match(media['link'])
+        if m:
+            code = m.group(1)
+
+        media['code'] = code
+
+        return media
+
+    def _fetch_next_media(self):
+        resp = self.s.get(self._pagination['next_url'])
+        self._last_response = resp
+        self._pagination = resp.json()['pagination']
+
+        nodes = resp.json()['data']
+        for m in nodes:
+            self._media.append(self._format_media(m))
+
+        return len(nodes) > 0

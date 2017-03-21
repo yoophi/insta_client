@@ -3,7 +3,7 @@ import datetime
 import requests
 
 from . import logger, __version__
-from .instagram import InstaUser, InstaMedia, InstaHashtag, InstaFeed
+from .instagram import InstaUser, InstaMedia, InstaApiHashtag, InstaHashtag, InstaFeed
 from .session import InstaSession
 
 
@@ -413,3 +413,15 @@ class InstaApiClient(object):
         self.validate_response(rv, 'GET /media/%s/likes' % (media_id,))
 
         return rv.json()['data']
+
+    def get_tag_recent_media(self, hashtag):
+        url = 'https://api.instagram.com/v1/tags/%s/media/recent?access_token=%s' % (hashtag, self.access_token,)
+        rv = requests.get(url)
+
+        self.last_response = rv
+        self.validate_response(rv, 'GET /tags/%s/media/recent' % (hashtag,))
+
+        return rv.json()['data']
+
+    def get_hashtag(self, hashtag):
+        return InstaApiHashtag(hashtag, self.access_token)
