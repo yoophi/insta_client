@@ -1,6 +1,7 @@
 import datetime
 
 import requests
+from simplejson import JSONDecodeError
 
 from . import logger, __version__
 from .instagram import InstaUser, InstaMedia, InstaApiHashtag, InstaHashtag, InstaFeed
@@ -101,6 +102,7 @@ class InstaWebClient(object):
 
         self.media_by_tag = []
         self.csrftoken = ''
+        self.last_response = None
 
         logger.debug('%s v%s started' % (self.__class__.__name__, __version__))
 
@@ -150,6 +152,16 @@ class InstaWebClient(object):
 
         return self.get_user(username=self.s.user_login)
 
+    def check_login_status(self):
+        resp = self.s.get('https://www.instagram.com/')
+        self.last_response = resp
+
+        for s in resp.text.split('\n')[:5]:
+            if s.find('not-logged-in') >= 0:
+                return False
+
+        return True
+
     @_login_required
     def get_feed(self):
         return InstaFeed(session=self.s)
@@ -160,12 +172,20 @@ class InstaWebClient(object):
         comment_post = {'comment_text': text}
         url_comment = self.url_comment % media_id
         logger.debug('URL_COMMENT: %s' % url_comment)
+
+        resp = self.s.post(url_comment, data=comment_post)
+        self.last_response = resp
+
         try:
-            comment = self.s.post(url_comment, data=comment_post)
-            if comment.status_code == 200:
+            if resp.json().get('status') == 'ok':
                 self.comments_counter += 1
                 logger.debug('Write: "%s". #%i.' % (text, self.comments_counter))
-            return comment
+                return True
+
+        except JSONDecodeError:
+            if resp.text.find('not-logged-in') >= 0:
+                raise InstaLoginRequiredError
+
         except:
             raise InstaWebClientError("EXCEPT on comment!")
 
@@ -173,8 +193,18 @@ class InstaWebClient(object):
     def like(self, media_id):
         logger.debug('LIKE: <media_id:%s>' % media_id)
         url_likes = self.url_likes % media_id
+
+        resp = self.s.post(url_likes)
+        self.last_response = resp
+
         try:
-            return self.s.post(url_likes)
+            if resp.json().get('status') == 'ok':
+                return True
+
+        except JSONDecodeError:
+            if resp.text.find('not-logged-in') >= 0:
+                raise InstaLoginRequiredError
+
         except:
             raise InstaWebClientError("EXCEPT on like")
 
@@ -182,8 +212,18 @@ class InstaWebClient(object):
     def unlike(self, media_id):
         logger.debug('UNLIKE: <media_id:%s>' % media_id)
         url_unlike = self.url_unlike % media_id
+
+        resp = self.s.post(url_unlike)
+        self.last_response = resp
+
         try:
-            return self.s.post(url_unlike)
+            if resp.json().get('status') == 'ok':
+                return True
+
+        except JSONDecodeError:
+            if resp.text.find('not-logged-in') >= 0:
+                raise InstaLoginRequiredError
+
         except:
             raise InstaWebClientError("EXCEPT on unlike")
 
@@ -192,29 +232,72 @@ class InstaWebClient(object):
         logger.debug('FOLLOW: %s' % user_id)
         url_follow = self.url_follow % user_id
         logger.debug('URL_FOLLOW: %s' % url_follow)
+
+        resp = self.s.post(url_follow)
+        self.last_response = resp
+
         try:
-            follow = self.s.post(url_follow)
-            if follow.status_code == 200:
+            if resp.json().get('status') == 'ok':
                 self.follow_counter += 1
                 logger.debug("FOLLOW OK: %s #%i." % (user_id, self.follow_counter))
+                return True
 
-            return follow
+        except JSONDecodeError:
+            if resp.text.find('not-logged-in') >= 0:
+                raise InstaLoginRequiredError
+
         except Exception as e:
-            logger.error("EXCEPT on follow: %s" % e)
+            logger.error("EXCEPT on follow: %s %s" % (type(e), str(e)))
+            raise InstaWebClientError("EXCEPT on follow: %s" % e)
 
     @_login_required
     def unfollow(self, user_id):
         logger.debug('UNFOLLOW: %s' % user_id)
         url_unfollow = self.url_unfollow % user_id
         logger.debug('URL_UNFOLLOW: %s' % url_unfollow)
-        try:
-            unfollow = self.s.post(url_unfollow)
-            if unfollow.status_code == 200:
-                logger.debug("UNFOLLOW OK: %s #%i." % (user_id, self.unfollow_counter))
 
-            return unfollow
+        resp = self.s.post(url_unfollow)
+        self.last_response = resp
+
+        try:
+            if resp.json().get('status') == 'ok':
+                logger.debug("UNFOLLOW OK: %s #%i." % (user_id, self.unfollow_counter))
+                return True
+
+        except JSONDecodeError:
+            if resp.text.find('not-logged-in') >= 0:
+                raise InstaLoginRequiredError
+
         except Exception as e:
             logger.error("EXCEPT on unfollow: %s" % e)
+            raise InstaWebClientError("EXCEPT on unfollow: %s" % e)
+
+    def serialize(self):
+        if not self.s:
+            raise Exception('Not logged in')
+
+        return {
+            'csrftoken': self.csrftoken,
+            's.login_status': self.s.login_status,
+            's.user_login': self.s.user_login,
+            's.user_password': self.s.user_password,
+            's.headers': dict(self.s.headers),
+            's.cookies': self.s.cookies.get_dict(),
+        }
+
+    def deserialize(self, data):
+        if not self.s:
+            self.s = requests.Session()
+
+        self.csrftoken = data.get('csrftoken')
+
+        for k in ['login_status', 'user_login', 'user_password',]:
+            setattr(self.s, k, data.get('s.%s' % k))
+
+        for k, v in data.get('s.cookies').items():
+            self.s.cookies.set(k, v)
+
+        self.s.headers.update(data.get('s.headers', {}))
 
 
 class InstaApiClient(object):
