@@ -1,4 +1,5 @@
-import datetime
+# -*- coding: utf-8 -*-
+from datetime import datetime
 
 import requests
 from simplejson import JSONDecodeError
@@ -51,7 +52,7 @@ class InstaWebClient(object):
 
     user_agent = ("Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 "
                   "(KHTML, like Gecko) Chrome/48.0.2564.103 Safari/537.36")
-    accept_language = 'ru-RU,ru;q=0.8,en-US;q=0.6,en;q=0.4'
+    accept_language = 'ko-KR,ko;q=0.8,en-US;q=0.6,en;q=0.4'
 
     # If instagram ban you - query return 400 error.
     error_400 = 0
@@ -83,9 +84,58 @@ class InstaWebClient(object):
 
         return check_login
 
-    def __init__(self, login=None, password=None, access_token=None, session=None):
-        self.bot_start = datetime.datetime.now()
+    def _check_ratelimit(key):
+        def check_ratelimit(f):
+            def func(self, *args, **kwargs):
+                if self.ratelimit_enabled(key):
+                    ratelimit_key = self.get_ratelimit_key(key)
+                    if self.cache.get(ratelimit_key) > getattr(self, '%s_per_hour' % key):
+                        raise RateLimitException(key)
 
+                return f(self, *args, **kwargs)
+
+            return func
+
+        return check_ratelimit
+
+    def get_ratelimit(self, key=None):
+        if not self.cache:
+            return
+
+        if key:
+            return self.cache.get(self.get_ratelimit_key(key))
+
+        return {
+            key: self.cache.get(self.get_ratelimit_key(key))
+            for key in ('comment', 'like', 'follow')
+        }
+
+    def ratelimit_enabled(self, key):
+        return self.cache and getattr(self, '%s_per_hour' % key)
+
+    def get_ratelimit_key(self, key):
+        current_hour = datetime.now().hour
+        return '_IWC:%s:%s:%02d' % (self.user_login, key, current_hour)
+
+    def inc_ratelimit(self, key):
+        if not self.cache:
+            return
+
+        ratelimit_key = self.get_ratelimit_key(key)
+        logger.debug('ratelimit_key %s' % ratelimit_key)
+        self.cache.cache.inc(ratelimit_key)
+
+        rv = self.cache.get(ratelimit_key)
+        if rv:
+            rv = self.cache.cache.inc(ratelimit_key)
+        else:
+            self.cache.set(ratelimit_key, 1, timeout=3600)
+            rv = 1
+
+        return rv
+
+    def __init__(self, login=None, password=None, access_token=None, session=None,
+                 follow_per_hour=None, like_per_hour=None, comment_per_hour=None, cache=None,):
         if session:
             self.s = session
         else:
@@ -102,6 +152,12 @@ class InstaWebClient(object):
 
         self.media_by_tag = []
         self.csrftoken = ''
+
+        self.cache = cache  # Flask-Cache RedisCache instance
+        self.comment_per_hour = comment_per_hour
+        self.follow_per_hour = follow_per_hour
+        self.like_per_hour = like_per_hour
+
         self.last_response = None
 
         logger.debug('%s v%s started' % (self.__class__.__name__, __version__))
@@ -146,10 +202,8 @@ class InstaWebClient(object):
     def get_hashtag(self, tagname):
         return InstaHashtag(tagname, session=self.s)
 
+    @_login_required
     def get_current_user(self):
-        if not self.s.user_login:
-            raise InstaWebClientError('not logged in yet')
-
         return self.get_user(username=self.s.user_login)
 
     def check_login_status(self):
@@ -167,6 +221,7 @@ class InstaWebClient(object):
         return InstaFeed(session=self.s)
 
     @_login_required
+    @_check_ratelimit('comment')
     def comment(self, media_id, text):
         logger.debug('COMMENT: <media_id:%s> <text:%s>' % (media_id, text))
         comment_post = {'comment_text': text}
@@ -178,6 +233,9 @@ class InstaWebClient(object):
 
         try:
             if resp.json().get('status') == 'ok':
+                if self.ratelimit_enabled('comment'):
+                    self.inc_ratelimit('comment')
+
                 self.comments_counter += 1
                 logger.debug('Write: "%s". #%i.' % (text, self.comments_counter))
                 return True
@@ -190,6 +248,7 @@ class InstaWebClient(object):
             raise InstaWebClientError("EXCEPT on comment!")
 
     @_login_required
+    @_check_ratelimit('like')
     def like(self, media_id):
         logger.debug('LIKE: <media_id:%s>' % media_id)
         url_likes = self.url_likes % media_id
@@ -199,6 +258,9 @@ class InstaWebClient(object):
 
         try:
             if resp.json().get('status') == 'ok':
+                if self.ratelimit_enabled('like'):
+                    self.inc_ratelimit('like')
+
                 return True
 
         except JSONDecodeError:
@@ -209,6 +271,7 @@ class InstaWebClient(object):
             raise InstaWebClientError("EXCEPT on like")
 
     @_login_required
+    @_check_ratelimit('like')
     def unlike(self, media_id):
         logger.debug('UNLIKE: <media_id:%s>' % media_id)
         url_unlike = self.url_unlike % media_id
@@ -218,6 +281,9 @@ class InstaWebClient(object):
 
         try:
             if resp.json().get('status') == 'ok':
+                if self.ratelimit_enabled('like'):
+                    self.inc_ratelimit('like')
+
                 return True
 
         except JSONDecodeError:
@@ -228,6 +294,15 @@ class InstaWebClient(object):
             raise InstaWebClientError("EXCEPT on unlike")
 
     @_login_required
+    def user_followed_user(self, username):
+        u = self.get_user_by_username(username)
+        if u.followed_by_viewer:
+            return True
+
+        return False
+
+    @_login_required
+    @_check_ratelimit('follow')
     def follow(self, user_id):
         logger.debug('FOLLOW: %s' % user_id)
         url_follow = self.url_follow % user_id
@@ -238,6 +313,9 @@ class InstaWebClient(object):
 
         try:
             if resp.json().get('status') == 'ok':
+                if self.ratelimit_enabled('follow'):
+                    self.inc_ratelimit('follow')
+
                 self.follow_counter += 1
                 logger.debug("FOLLOW OK: %s #%i." % (user_id, self.follow_counter))
                 return True
@@ -251,6 +329,7 @@ class InstaWebClient(object):
             raise InstaWebClientError("EXCEPT on follow: %s" % e)
 
     @_login_required
+    @_check_ratelimit('follow')
     def unfollow(self, user_id):
         logger.debug('UNFOLLOW: %s' % user_id)
         url_unfollow = self.url_unfollow % user_id
@@ -261,6 +340,9 @@ class InstaWebClient(object):
 
         try:
             if resp.json().get('status') == 'ok':
+                if self.ratelimit_enabled('follow'):
+                    self.inc_ratelimit('follow')
+
                 logger.debug("UNFOLLOW OK: %s #%i." % (user_id, self.unfollow_counter))
                 return True
 

@@ -10,6 +10,8 @@ from lxml import html
 from . import logger
 from .session import InstaSession
 
+class InstaUserNotFoundError(Exception):
+    pass
 
 class InstaBase(object):
     accept_language = 'ru-RU,ru;q=0.8,en-US;q=0.6,en;q=0.4'
@@ -80,10 +82,30 @@ class InstaBase(object):
 
 class InstaUser(InstaBase):
     def __init__(self, user_id=None, username=None, session=None):
+        """
+        username 에 해당하는 사용자 찾기
+
+        :param user_id:
+        :param username:
+        :param session:
+        :raises InstaUserNotFoundException: username 에 해당하는 사용자를 찾을 수 없음
+        """
         super(InstaUser, self).__init__()
 
         if not session:
             session = InstaSession()
+            session.cookies.update({'sessionid': '', 'mid': '', 'ig_pr': '1',
+                                    'ig_vw': '1920', 'csrftoken': '',
+                                    's_network': '', 'ds_user_id': ''})
+            session.headers.update({'Accept-Encoding': 'gzip, deflate',
+                                    'Accept-Language': self.accept_language,
+                                    'Connection': 'keep-alive',
+                                    'Content-Length': '0',
+                                    'Host': 'www.instagram.com',
+                                    'Origin': 'https://www.instagram.com',
+                                    'Referer': 'https://www.instagram.com/',
+                                    'User-Agent': self.user_agent,
+                                    })
 
         self.s = session
         self.id = user_id
@@ -95,20 +117,6 @@ class InstaUser(InstaBase):
         self.follows_count = 1  # FIXME
         self.followed_by_count = 1  # FIXME
 
-        self.s.cookies.update({'sessionid': '', 'mid': '', 'ig_pr': '1',
-                               'ig_vw': '1920', 'csrftoken': '',
-                               's_network': '', 'ds_user_id': ''})
-
-        self.s.headers.update({'Accept-Encoding': 'gzip, deflate',
-                               'Accept-Language': self.accept_language,
-                               'Connection': 'keep-alive',
-                               'Content-Length': '0',
-                               'Host': 'www.instagram.com',
-                               'Origin': 'https://www.instagram.com',
-                               'Referer': 'https://www.instagram.com/',
-                               'User-Agent': self.user_agent,
-                               })
-
         if self.username:
             self.profile_url = 'https://www.instagram.com/{username}/'.format(username=self.username)
             resp = self.s.get(self.profile_url)
@@ -118,7 +126,9 @@ class InstaUser(InstaBase):
             _shared_data = ''.join(
                 re.findall(r'window._sharedData = (.*);', _script_text))
 
-            assert resp.status_code == 200
+            if not resp.status_code == 200:
+                raise InstaUserNotFoundError
+
             data = json.loads(_shared_data)
 
             user_obj = data['entry_data']['ProfilePage'][0]['user']
@@ -130,12 +140,14 @@ class InstaUser(InstaBase):
                 self._media.append(self._format_media(m))
 
             self._last_response = resp
+            self._data = data
 
             self.s.headers.update({'X-CSRFToken': resp.cookies['csrftoken']})
 
             for key in (
                     'country_block', 'external_url', 'full_name', 'id', 'is_private',
                     'is_verified', 'profile_pic_url', 'biography',
+                    'follows_viewer', 'followed_by_viewer',
                     'profile_pic_url_hd', 'username',):
                 setattr(self, key, self.info.get(key))
 
@@ -455,7 +467,7 @@ class InstaMedia(InstaBase):
             if not self.owner['username']:
                 raise ValueError('media not loaded')
 
-            self._user = InstaUser(username=self.owner['username'])
+            self._user = InstaUser(username=self.owner['username'], session=self.s)
 
         return self._user
 
@@ -551,24 +563,23 @@ class InstaFeed(InstaBase):
 
         if not session:
             session = InstaSession()
+            session.cookies.update({'sessionid': '', 'mid': '', 'ig_pr': '1',
+                                    'ig_vw': '1920', 'csrftoken': '',
+                                    's_network': '', 'ds_user_id': ''})
+
+            session.headers.update({'Accept-Encoding': 'gzip, deflate',
+                                    'Accept-Language': self.accept_language,
+                                    'Connection': 'keep-alive',
+                                    'Content-Length': '0',
+                                    'Host': 'www.instagram.com',
+                                    'Origin': 'https://www.instagram.com',
+                                    'Referer': 'https://www.instagram.com/',
+                                    'User-Agent': self.user_agent,
+                                    })
 
         self.s = session
         self.id = user_id
         self.username = username
-
-        self.s.cookies.update({'sessionid': '', 'mid': '', 'ig_pr': '1',
-                               'ig_vw': '1920', 'csrftoken': '',
-                               's_network': '', 'ds_user_id': ''})
-
-        self.s.headers.update({'Accept-Encoding': 'gzip, deflate',
-                               'Accept-Language': self.accept_language,
-                               'Connection': 'keep-alive',
-                               'Content-Length': '0',
-                               'Host': 'www.instagram.com',
-                               'Origin': 'https://www.instagram.com',
-                               'Referer': 'https://www.instagram.com/',
-                               'User-Agent': self.user_agent,
-                               })
 
         if not self.s.login_status:
             raise Exception('NOT LOGGED IN')

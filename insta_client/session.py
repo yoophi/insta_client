@@ -33,6 +33,7 @@ class InstaSession(requests.Session):
         self.user_id = None
         self.user_login = None
         self.user_password = None
+        self.last_response = None
 
     def login(self, login=None, password=None):
         if login:
@@ -64,6 +65,7 @@ class InstaSession(requests.Session):
         time.sleep(5 * random.random())
         logger.debug('POST %s' % self.url_login, extra=_login_post)
         login = self.post(self.url_login, data=_login_post, allow_redirects=True)
+        self.last_response = login
         logger.debug('POST STATUS_CODE: %s' % login.status_code)
         self.headers.update({'X-CSRFToken': login.cookies['csrftoken']})
         self.csrftoken = login.cookies['csrftoken']
@@ -77,11 +79,15 @@ class InstaSession(requests.Session):
             if finder != -1:
                 self.login_status = True
                 logger.debug('LOGIN SUCCESS: %s' % self.user_login)
+
+                return True
             else:
                 self.login_status = False
                 logger.error('LOGIN ERROR: Check your login data!')
         else:
             logger.error('LOGIN ERROR: Connection error!')
+
+        return False
 
     def logout(self):
         logger.debug('Logout')
