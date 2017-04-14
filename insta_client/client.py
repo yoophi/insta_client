@@ -114,8 +114,7 @@ class InstaWebClient(object):
         return self.cache and getattr(self, '%s_per_hour' % key)
 
     def get_ratelimit_key(self, key):
-        current_hour = datetime.now().hour
-        return '_IWC:%s:%s:%02d' % (self.user_login, key, current_hour)
+        return 'IWC:RATELIMIT:%s:%s:%s' % (self.user_login, key, datetime.now().strptime('%Y%m%d:%H'))
 
     def inc_ratelimit(self, key):
         if not self.cache:
