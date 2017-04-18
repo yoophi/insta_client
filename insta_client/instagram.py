@@ -321,16 +321,44 @@ class InstaMedia(InstaBase):
 
         self.s = session
         self.url = 'https://www.instagram.com/p/%s/' % (code,)
+        self._user = None
 
         resp = self.s.get(self.url + '?__a=1')
         self._last_response = resp
 
         data = resp.json()
-        self.data = data['media']
-        for key in self.data.keys():
-            setattr(self, key, self.data[key])
 
-        self.tags = self._parse_caption_hashtags(self.data.get('caption'))
+        self._data = _data = data['graphql']['shortcode_media']
+        # self.tags = self._parse_caption_hashtags(self.data.get('caption'))
+
+    @property
+    def data(self):
+        return {
+            'display_src': self._data['display_url'],
+            'owner': self._data['owner'],
+            'code': self._data['shortcode'],
+            'caption': self._data['edge_media_to_caption']['edges'][0]['node']['text'],
+            'comments_count': self._data['edge_media_to_comment']['count'],
+            'likes_count': self._data['edge_media_preview_like']['count'],
+        }
+
+    @property
+    def tags(self):
+        return self._parse_caption_hashtags(self.data.get('caption'))
+
+    @property
+    def owner(self):
+        return self.data['owner']
+
+    @property
+    def user(self):
+        if not self._user:
+            if not self.owner['username']:
+                raise ValueError('media not loaded')
+
+            self._user = InstaUser(username=self.owner['username'], session=self.s)
+
+        return self._user
 
 
 class InstaHashtag(InstaBase):
