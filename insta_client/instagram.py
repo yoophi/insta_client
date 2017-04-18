@@ -467,6 +467,18 @@ class InstaMedia(InstaBase):
         }
 
     @property
+    def id(self):
+        return self._data['id']
+
+    @property
+    def code(self):
+        return self._data['shortcode']
+
+    @property
+    def owner(self):
+        return self._data['owner']
+
+    @property
     def user(self):
         if not self._user:
             if not self.owner['username']:
