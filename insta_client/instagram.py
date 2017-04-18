@@ -453,13 +453,18 @@ class InstaMedia(InstaBase):
 
         resp = self.s.get(self.url + '?__a=1')
         self._last_response = resp
+        self._data = resp.json()['graphql']['shortcode_media']
 
-        data = resp.json()
-        self.data = data['media']
-        for key in self.data.keys():
-            setattr(self, key, self.data[key])
-
-        self.tags = self._parse_caption_hashtags(self.data.get('caption'))
+    @property
+    def data(self):
+        return {
+            'display_src': self._data['display_url'],
+            'owner': self._data['owner'],
+            'code': self._data['shortcode'],
+            'caption': self._data['edge_media_to_caption']['edges'][0]['node']['text'],
+            'comments_count': self._data['edge_media_to_comment']['count'],
+            'likes_count': self._data['edge_media_preview_like']['count'],
+        }
 
     @property
     def user(self):
