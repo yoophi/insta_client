@@ -114,7 +114,7 @@ class InstaWebClient(object):
         return self.cache and getattr(self, '%s_per_hour' % key)
 
     def get_ratelimit_key(self, key):
-        return 'IWC:RATELIMIT:%s:%s:%s' % (self.user_login, key, datetime.now().strptime('%Y%m%d:%H'))
+        return 'IWC:RATELIMIT:%s:%s:%s' % (self.user_login, key, datetime.now().strftime('%Y%m%d:%H'))
 
     def inc_ratelimit(self, key):
         if not self.cache:
@@ -577,6 +577,16 @@ class InstaApiClient(object):
         self.validate_response(rv, 'GET /media/%s/likes' % (media_id,))
 
         return rv.json()['data']
+
+    def media_comments(self, media_id):
+        url = 'https://api.instagram.com/v1/media/%s/comments?access_token=%s' % (media_id, self.access_token,)
+        rv = requests.get(url)
+
+        self.last_response = rv
+        self.validate_response(rv, 'GET /media/%s/comments' % (media_id,))
+
+        return rv.json()['data']
+
 
     def get_tag_recent_media(self, hashtag):
         url = 'https://api.instagram.com/v1/tags/%s/media/recent?access_token=%s' % (hashtag, self.access_token,)

@@ -453,14 +453,12 @@ class InstaMedia(InstaBase):
 
         resp = self.s.get(self.url + '?__a=1')
         self._last_response = resp
-
-        data = resp.json()
-
-        self._data = _data = data['graphql']['shortcode_media']
+        self._data = resp.json()['graphql']['shortcode_media']
 
     @property
     def data(self):
         return {
+            'id': self._data['id'],
             'display_src': self._data['display_url'],
             'owner': self._data['owner'],
             'code': self._data['shortcode'],
@@ -474,28 +472,26 @@ class InstaMedia(InstaBase):
         return self._parse_caption_hashtags(self.data.get('caption'))
 
     @property
+    def user(self):
+        if not self._user:
+            if not self.owner['username']:
+                raise ValueError('media not loaded')
+
+            self._user = InstaUser(username=self.owner['username'], session=self.s)
+
+        return self._user
+
+    @property
+    def id(self):
+        return self._data['id']
+
+    @property
+    def code(self):
+        return self._data['shortcode']
+
+    @property
     def owner(self):
-        return self.data['owner']
-
-    @property
-    def user(self):
-        if not self._user:
-            if not self.owner['username']:
-                raise ValueError('media not loaded')
-
-            self._user = InstaUser(username=self.owner['username'], session=self.s)
-
-        return self._user
-
-    @property
-    def user(self):
-        if not self._user:
-            if not self.owner['username']:
-                raise ValueError('media not loaded')
-
-            self._user = InstaUser(username=self.owner['username'], session=self.s)
-
-        return self._user
+        return self._data['owner']
 
 
 class InstaHashtag(InstaBase):
