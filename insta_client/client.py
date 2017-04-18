@@ -578,6 +578,16 @@ class InstaApiClient(object):
 
         return rv.json()['data']
 
+    def media_comments(self, media_id):
+        url = 'https://api.instagram.com/v1/media/%s/comments?access_token=%s' % (media_id, self.access_token,)
+        rv = requests.get(url)
+
+        self.last_response = rv
+        self.validate_response(rv, 'GET /media/%s/comments' % (media_id,))
+
+        return rv.json()['data']
+
+
     def get_tag_recent_media(self, hashtag):
         url = 'https://api.instagram.com/v1/tags/%s/media/recent?access_token=%s' % (hashtag, self.access_token,)
         rv = requests.get(url)
