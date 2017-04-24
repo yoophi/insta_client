@@ -458,6 +458,7 @@ class InstaMedia(InstaBase):
     @property
     def data(self):
         return {
+            'id': self._data['id'],
             'display_src': self._data['display_url'],
             'owner': self._data['owner'],
             'code': self._data['shortcode'],
@@ -505,6 +506,9 @@ class InstaMedia(InstaBase):
     def owner(self):
         return self._data['owner']
 
+    def tags(self):
+        return self._parse_caption_hashtags(self.data.get('caption'))
+
     @property
     def user(self):
         if not self._user:
@@ -514,6 +518,7 @@ class InstaMedia(InstaBase):
             self._user = InstaUser(username=self.owner['username'], session=self.s)
 
         return self._user
+
 
 
 class InstaHashtag(InstaBase):
