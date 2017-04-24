@@ -587,7 +587,6 @@ class InstaApiClient(object):
 
         return rv.json()['data']
 
-
     def get_tag_recent_media(self, hashtag):
         url = 'https://api.instagram.com/v1/tags/%s/media/recent?access_token=%s' % (hashtag, self.access_token,)
         rv = requests.get(url)
@@ -599,3 +598,12 @@ class InstaApiClient(object):
 
     def get_hashtag(self, hashtag):
         return InstaApiHashtag(hashtag, self.access_token)
+
+    def get_hashtag_media_count(self, hashtag):
+        url = 'https://api.instagram.com/v1/tags/%s?access_token=%s' % (hashtag, self.access_token)
+        rv = requests.get(url)
+
+        self.last_response = rv
+        self.validate_response(rv, 'GET /tags/%s' % (hashtag,))
+
+        return rv.json()['data']

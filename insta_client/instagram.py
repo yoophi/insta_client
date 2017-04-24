@@ -471,8 +471,35 @@ class InstaMedia(InstaBase):
         return self._data['id']
 
     @property
+    def media_id(self):
+        return self._data['id']
+
+    @property
+    def insta_id(self):
+        return self._data['owner']['id']
+
+    @property
     def code(self):
         return self._data['shortcode']
+
+    @property
+    def caption(self):
+        try:
+            return self._data['edge_media_to_caption']['edges'][0]['node']['text']
+        except:
+            return ''
+
+    @property
+    def display_src(self):
+        return self._data['display_url']
+
+    @property
+    def comments_count(self):
+        return self._data['edge_media_to_comment']['count']
+
+    @property
+    def likes_count(self):
+        return self._data['edge_media_preview_like']['count']
 
     @property
     def owner(self):
