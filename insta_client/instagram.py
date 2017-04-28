@@ -457,12 +457,20 @@ class InstaMedia(InstaBase):
 
     @property
     def data(self):
+        logger.debug(self._data)
+
+        caption = ''
+        try:
+            caption = self._data['edge_media_to_caption']['edges'][0]['node']['text']
+        except:
+            pass
+        
         return {
             'id': self._data['id'],
             'display_src': self._data['display_url'],
             'owner': self._data['owner'],
             'code': self._data['shortcode'],
-            'caption': self._data['edge_media_to_caption']['edges'][0]['node']['text'],
+            'caption': caption,
             'comments_count': self._data['edge_media_to_comment']['count'],
             'likes_count': self._data['edge_media_preview_like']['count'],
         }
