@@ -13,6 +13,7 @@ from .session import InstaSession
 class InstaUserNotFoundError(Exception):
     pass
 
+
 class InstaBase(object):
     accept_language = 'ru-RU,ru;q=0.8,en-US;q=0.6,en;q=0.4'
     user_agent = ("Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 "
@@ -119,19 +120,18 @@ class InstaUser(InstaBase):
 
         if self.username:
             self.profile_url = 'https://www.instagram.com/{username}/'.format(username=self.username)
+
             resp = self.s.get(self.profile_url)
             tree = html.fromstring(resp.content)
-            _script_text = ''.join(
-                tree.xpath('//script[contains(text(), "sharedData")]/text()'))
-            _shared_data = ''.join(
-                re.findall(r'window._sharedData = (.*);', _script_text))
+            _script_text = ''.join(tree.xpath('//script[contains(text(), "sharedData")]/text()'))
+            _shared_data = ''.join(re.findall(r'window._sharedData = (.*);', _script_text))
 
             if not resp.status_code == 200:
                 raise InstaUserNotFoundError
 
-            data = json.loads(_shared_data)
+            _data = json.loads(_shared_data)
 
-            user_obj = data['entry_data']['ProfilePage'][0]['user']
+            user_obj = _data['entry_data']['ProfilePage'][0]['user']
             media_obj = user_obj.pop('media')
             self.info = user_obj
             self.media_count = media_obj['count']
@@ -140,7 +140,7 @@ class InstaUser(InstaBase):
                 self._media.append(self._format_media(m))
 
             self._last_response = resp
-            self._data = data
+            self._raw = self._data = _data
 
             self.s.headers.update({'X-CSRFToken': resp.cookies['csrftoken']})
 
@@ -153,6 +153,22 @@ class InstaUser(InstaBase):
 
             for key in ('followed_by', 'follows',):
                 setattr(self, key + '_count', self.info[key]['count'])
+
+    @property
+    def api_data(self):
+        return {
+            "id": "",
+            "username": "",
+            "full_name": "",
+            "profile_picture": "",
+            "bio": "",
+            "website": "",
+            "counts": {
+                "media": "",
+                "follows": "",
+                "followed_by": ""
+            }
+        }
 
     @property
     def avg_comments(self):
@@ -526,7 +542,6 @@ class InstaMedia(InstaBase):
             self._user = InstaUser(username=self.owner['username'], session=self.s)
 
         return self._user
-
 
 
 class InstaHashtag(InstaBase):
