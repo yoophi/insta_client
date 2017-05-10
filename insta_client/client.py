@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from datetime import datetime
 
+import pytz
 import requests
 from simplejson import JSONDecodeError
 
@@ -419,8 +420,8 @@ class InstaApiClient(object):
 
         return self._access_token
 
-    def get_user_follows(self, next_page_url=None):
-        url = 'https://api.instagram.com/v1/users/self/follows?access_token=%s' % (self.access_token,)
+    def get_user_follows(self, next_page_url=None, count=50):
+        url = 'https://api.instagram.com/v1/users/self/follows?access_token=%s&count=%d' % (self.access_token, count)
 
         if next_page_url:
             url = next_page_url
@@ -437,10 +438,12 @@ class InstaApiClient(object):
         except:
             pass
 
-        return data, next_url is not None, next_url
+        has_next = next_url is not None
 
-    def get_user_followed_by(self, next_page_url=None):
-        url = 'https://api.instagram.com/v1/users/self/followed-by?access_token=%s' % (self.access_token,)
+        return data, has_next, next_url
+
+    def get_user_followed_by(self, next_page_url=None, count=50):
+        url = 'https://api.instagram.com/v1/users/self/followed-by?access_token=%s&count=%d' % (self.access_token, count)
 
         if next_page_url:
             url = next_page_url
@@ -457,7 +460,9 @@ class InstaApiClient(object):
         except:
             pass
 
-        return data, next_url is not None, next_url
+        has_next = next_url is not None
+
+        return data, has_next, next_url
 
     def get_username_by_id(self, id):
         data = self.get_userdata_by_id(id)
@@ -557,17 +562,31 @@ class InstaApiClient(object):
 
         return False
 
-    def user_recent_media(self, user_id):
-        url = 'https://api.instagram.com/v1/users/%s/media/recent?access_token=%s' % (user_id, self.access_token,)
+    def user_recent_media(self, user_id, next_page_url=None, count=33):
+        url = 'https://api.instagram.com/v1/users/%s/media/recent?access_token=%s&count=%d' % (user_id, self.access_token, count)
+
+        if next_page_url:
+            url = next_page_url
+
         rv = requests.get(url)
 
         self.last_response = rv
         self.validate_response(rv, 'GET /users/%s/media/recent' % (user_id,))
 
-        return rv.json()['data']
+        next_url = None
 
-    def self_recent_media(self):
-        return self.user_recent_media('self')
+        data = rv.json().get('data', [])
+        try:
+            next_url = rv.json()['pagination']['next_url']
+        except:
+            pass
+
+        has_next = next_url is not None
+
+        return data, has_next, next_url
+
+    def self_recent_media(self, next_page_url=None, count=20):
+        return self.user_recent_media('self', next_page_url=next_page_url, count=count)
 
     def media_likes(self, media_id):
         url = 'https://api.instagram.com/v1/media/%s/likes?access_token=%s' % (media_id, self.access_token,)

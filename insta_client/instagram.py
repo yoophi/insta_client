@@ -3,12 +3,14 @@ import json
 import re
 import urllib
 from collections import Counter
+from datetime import datetime
 
 from itp import itp
 from lxml import html
 
 from . import logger
 from .session import InstaSession
+
 
 class InstaUserNotFoundError(Exception):
     pass
@@ -114,6 +116,7 @@ class InstaUser(InstaBase):
 
         self._follows = []
         self._followed_by = []
+        self._media = []
 
         self.follows_count = 1  # FIXME
         self.followed_by_count = 1  # FIXME
@@ -183,6 +186,13 @@ class InstaUser(InstaBase):
             return sum([m['likes']['count'] for m in self._media]) / len(self._media)
 
         return 0
+
+    @property
+    def last_media_at(self):
+        try:
+            return datetime.fromtimestamp(self._media[0]['date'])
+        except:
+            return None
 
     @property
     def gen_follows(self):
