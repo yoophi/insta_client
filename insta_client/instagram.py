@@ -134,7 +134,11 @@ class InstaUser(InstaBase):
 
             _data = json.loads(_shared_data)
 
-            user_obj = _data['entry_data']['ProfilePage'][0]['user']
+            try:
+                user_obj = _data['entry_data']['ProfilePage'][0]['user']
+            except KeyError:
+                raise InstaUserNotFoundError
+
             media_obj = user_obj.pop('media')
             self.info = user_obj
             self.media_count = media_obj['count']
