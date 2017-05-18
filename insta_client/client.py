@@ -37,6 +37,10 @@ class NotFoundException(Exception):
 class RateLimitException(Exception):
     pass
 
+class InstaWebRateLimitException(Exception):
+    pass
+
+
 
 class InstaWebClient(object):
     url = 'https://www.instagram.com/'
