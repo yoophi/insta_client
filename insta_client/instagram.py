@@ -9,6 +9,7 @@ from itp import itp
 from lxml import html
 
 from . import logger
+from .client import InstaWebRateLimitException
 from .session import InstaSession
 
 
@@ -128,6 +129,9 @@ class InstaUser(InstaBase):
             tree = html.fromstring(resp.content)
             _script_text = ''.join(tree.xpath('//script[contains(text(), "sharedData")]/text()'))
             _shared_data = ''.join(re.findall(r'window._sharedData = (.*);', _script_text))
+
+            if resp.status_code == 429:
+                raise InstaWebRateLimitException
 
             if not resp.status_code == 200:
                 raise InstaUserNotFoundError
@@ -494,7 +498,7 @@ class InstaMedia(InstaBase):
             caption = self._data['edge_media_to_caption']['edges'][0]['node']['text']
         except:
             pass
-        
+
         return {
             'id': self._data['id'],
             'display_src': self._data['display_url'],
@@ -872,7 +876,8 @@ class InstaApiHashtag(InstaApiBase):
         self.media_count = resp.json()['data']['media_count']
 
         # MEDIA 첫 페이지 가져오기
-        self.endpoint = 'https://api.instagram.com/v1/tags/%s/media/recent?access_token=%s' % (hashtag, self.access_token,)
+        self.endpoint = 'https://api.instagram.com/v1/tags/%s/media/recent?access_token=%s' % (
+        hashtag, self.access_token,)
         resp = self.s.get(self.endpoint)
         self._last_response = resp
         self._pagination = resp.json()['pagination']
