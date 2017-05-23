@@ -9,7 +9,6 @@ from itp import itp
 from lxml import html
 
 from . import logger
-from .client import InstaWebRateLimitException
 from .session import InstaSession
 
 
@@ -94,6 +93,8 @@ class InstaUser(InstaBase):
         :param session:
         :raises InstaUserNotFoundException: username 에 해당하는 사용자를 찾을 수 없음
         """
+        from .client import InstaWebRateLimitException
+
         super(InstaUser, self).__init__()
 
         if not session:
@@ -873,6 +874,9 @@ class InstaApiHashtag(InstaApiBase):
         # 해시태그의 글 갯수 가져오기
         endpoint = 'https://api.instagram.com/v1/tags/%s?access_token=%s' % (hashtag, self.access_token,)
         resp = self.s.get(endpoint)
+        if resp.status_code == 429:
+            raise RateLimitException
+
         self.media_count = resp.json()['data']['media_count']
 
         # MEDIA 첫 페이지 가져오기
@@ -906,12 +910,15 @@ class InstaApiHashtag(InstaApiBase):
         return media
 
     def _fetch_next_media(self):
-        resp = self.s.get(self._pagination['next_url'])
-        self._last_response = resp
-        self._pagination = resp.json()['pagination']
+        try:
+            resp = self.s.get(self._pagination['next_url'])
+            self._last_response = resp
+            self._pagination = resp.json()['pagination']
 
-        nodes = resp.json()['data']
-        for m in nodes:
-            self._media.append(self._format_media(m))
+            nodes = resp.json()['data']
+            for m in nodes:
+                self._media.append(self._format_media(m))
 
-        return len(nodes) > 0
+            return len(nodes) > 0
+        except KeyError:
+            raise StopIteration
