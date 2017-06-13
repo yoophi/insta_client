@@ -9,11 +9,8 @@ from itp import itp
 from lxml import html
 
 from . import logger
+from .exceptions import InstaUserNotFoundError, InstaWebRateLimitException
 from .session import InstaSession
-
-
-class InstaUserNotFoundError(Exception):
-    pass
 
 
 class InstaBase(object):
@@ -93,7 +90,6 @@ class InstaUser(InstaBase):
         :param session:
         :raises InstaUserNotFoundException: username 에 해당하는 사용자를 찾을 수 없음
         """
-        from .client import InstaWebRateLimitException
 
         super(InstaUser, self).__init__()
 
@@ -881,7 +877,7 @@ class InstaApiHashtag(InstaApiBase):
 
         # MEDIA 첫 페이지 가져오기
         self.endpoint = 'https://api.instagram.com/v1/tags/%s/media/recent?access_token=%s' % (
-        hashtag, self.access_token,)
+            hashtag, self.access_token,)
         resp = self.s.get(self.endpoint)
         self._last_response = resp
         self._pagination = resp.json()['pagination']

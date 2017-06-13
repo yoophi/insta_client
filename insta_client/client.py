@@ -1,45 +1,14 @@
 # -*- coding: utf-8 -*-
 from datetime import datetime
 
-import pytz
 import requests
 from simplejson import JSONDecodeError
 
 from . import logger, __version__
+from .exceptions import InstaLoginRequiredError, InstaApiClientError, InstaWebClientError, \
+    BadRequestException, InvalidAccessTokenException, NotFoundException, RateLimitException, APINotAllowedError
 from .instagram import InstaUser, InstaMedia, InstaApiHashtag, InstaHashtag, InstaFeed
 from .session import InstaSession
-
-
-class InstaLoginRequiredError(Exception):
-    pass
-
-
-class InstaApiClientError(Exception):
-    pass
-
-
-class InstaWebClientError(Exception):
-    pass
-
-
-class BadRequestException(Exception):
-    pass
-
-
-class InvalidAccessTokenException(Exception):
-    pass
-
-
-class NotFoundException(Exception):
-    pass
-
-
-class RateLimitException(Exception):
-    pass
-
-
-class InstaWebRateLimitException(Exception):
-    pass
 
 
 class InstaWebClient(object):
@@ -410,6 +379,8 @@ class InstaApiClient(object):
 
             if error_type == 'OAuthAccessTokenException':
                 raise InvalidAccessTokenException(msg)
+            elif error_type == 'APINotAllowedError':
+                raise APINotAllowedError(msg)
             elif error_type == 'APINotFoundError':
                 raise NotFoundException(msg)
 
