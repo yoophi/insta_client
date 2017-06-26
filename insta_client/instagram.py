@@ -504,6 +504,7 @@ class InstaMedia(InstaBase):
             'caption': caption,
             'comments_count': self._data['edge_media_to_comment']['count'],
             'likes_count': self._data['edge_media_preview_like']['count'],
+            'taken_at_timestamp': self._data['taken_at_timestamp'],
         }
 
     @property
@@ -532,6 +533,10 @@ class InstaMedia(InstaBase):
     @property
     def display_src(self):
         return self._data['display_url']
+
+    @property
+    def created_at(self):
+        return datetime.fromtimestamp(self._data['taken_at_timestamp'])
 
     @property
     def comments_count(self):
