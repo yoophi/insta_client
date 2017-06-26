@@ -9,7 +9,7 @@ from itp import itp
 from lxml import html
 
 from . import logger
-from .exceptions import InstaUserNotFoundError, InstaWebRateLimitException
+from .exceptions import InstaUserNotFoundError, InstaWebRateLimitException, RateLimitException
 from .session import InstaSession
 
 
